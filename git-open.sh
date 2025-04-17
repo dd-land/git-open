@@ -48,7 +48,7 @@ while [ $# -gt 0 ]; do
       exit 0
       ;;
     -v|--version)
-      echo "version 1.4"
+      echo "version 1.4.1"
       exit 0
       ;;
     *)
