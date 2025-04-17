@@ -1,12 +1,15 @@
 #!/bin/sh
 
 usage() {
-  echo "Usage: $0 [user name] [repo name]"
+  echo "Usage: $0 [-r remote] [user name] [repo name]"
+  echo ""
+  echo "Options:"
+  echo "  -r, --remote   Specify git remote name (default: origin)"
+  echo ""
   echo "Note: user name will default to \$GITHUB_USER or your \`git config --get github.user\` entry."
 }
 
-# creates variables into parent scope:
-# baseurl="https://github.com";username="jeffreyiacono";repo="git-open"
+# parse URL and set baseurl, username, repo
 parse_url() {
   local url="$1" project host proto path
 
@@ -24,49 +27,69 @@ parse_url() {
 
   project=${project%.git}
 
-  # update globals
   baseurl="https://$host"
   username="$path"
   repo="$project"
 }
 
-#parse_url git@github.com:glensc/git-open.git
-#parse_url https://github.com/jeffreyiacono/git-open
-#parse_url git@gitlab.com:gitlab-org/examples/mvn-example.git
+remote="origin"
+username=""
+repo=""
+
+# parse CLI args
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -r|--remote)
+      remote="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -v|--version)
+      echo "version 1.4.1"
+      exit 0
+      ;;
+    *)
+      if [ -z "$username" ]; then
+        username="$1"
+      elif [ -z "$repo" ]; then
+        repo="$1"
+      fi
+      shift
+      ;;
+  esac
+done
 
 git_repo=$(git rev-parse --git-dir 2>/dev/null)
 
-if [ $# = 0 ]; then
-  if [ -z "$git_repo" ]; then
+if [ -n "$username" ] && [ -n "$repo" ]; then
+  baseurl="https://github.com"
+elif [ -n "$git_repo" ]; then
+  url=$(git config "remote.${remote}.url")
+  if [ -z "$url" ]; then
+    echo "Error: remote '$remote' not found"
+    exit 1
+  fi
+  parse_url "$url"
+else
+  if [ -z "$repo" ]; then
     echo "Error: must pass repo name or run from a git repo to open"
     usage
     exit 1
   fi
-elif [ "$1" = "-h" ]; then
-  usage
-  exit 0
-elif [ "$1" = "-v" ]; then
-  echo "version 1.3"
-  exit 0
-fi
-
-if [ -z "$git_repo" ]; then
   baseurl=${GITHUB_URL:-"https://github.com"}
-else
-  # baseurl="https://github.com";username="jeffreyiacono";repo="git-open"
-  parse_url "$(git config remote.origin.url)"
 fi
 
-if [ $# = 1 ]; then
+if [ -z "$username" ]; then
   username=${GITHUB_USER:-$(git config --get github.user)}
-  repo=$1
-elif [ $# = 2 ]; then
-  username=$1
-  repo=$2
 fi
 
-if [ -n "${DEBUG:-}" ]; then
-  echo $baseurl/$username/$repo
+url="$baseurl/$username/$repo"
+
+if [ -n "$DEBUG" ]; then
+  echo "$url"
 else
-  open $baseurl/$username/$repo
+  open "$url"
 fi
