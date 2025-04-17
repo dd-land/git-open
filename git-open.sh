@@ -9,7 +9,7 @@ usage() {
   echo "Note: user name will default to \$GITHUB_USER or your \`git config --get github.user\` entry."
 }
 
-# creates variables into parent scope:
+# parse URL and set baseurl, username, repo
 parse_url() {
   local url="$1" project host proto path
 
@@ -27,7 +27,6 @@ parse_url() {
 
   project=${project%.git}
 
-  # update globals
   baseurl="https://$host"
   username="$path"
   repo="$project"
@@ -37,7 +36,7 @@ remote="origin"
 username=""
 repo=""
 
-# argument parsing
+# parse CLI args
 while [ $# -gt 0 ]; do
   case "$1" in
     -r|--remote)
@@ -53,10 +52,10 @@ while [ $# -gt 0 ]; do
       exit 0
       ;;
     *)
-      if [ -z "$repo" ]; then
-        repo="$1"
-      elif [ -z "$username" ]; then
+      if [ -z "$username" ]; then
         username="$1"
+      elif [ -z "$repo" ]; then
+        repo="$1"
       fi
       shift
       ;;
@@ -65,20 +64,22 @@ done
 
 git_repo=$(git rev-parse --git-dir 2>/dev/null)
 
-if [ -z "$git_repo" ]; then
-  if [ -z "$repo" ]; then
-    echo "Error: must pass repo name or run from a git repo to open"
-    usage
-    exit 1
-  fi
-  baseurl=${GITHUB_URL:-"https://github.com"}
-else
+if [ -n "$username" ] && [ -n "$repo" ]; then
+  baseurl="https://github.com"
+elif [ -n "$git_repo" ]; then
   url=$(git config "remote.${remote}.url")
   if [ -z "$url" ]; then
     echo "Error: remote '$remote' not found"
     exit 1
   fi
   parse_url "$url"
+else
+  if [ -z "$repo" ]; then
+    echo "Error: must pass repo name or run from a git repo to open"
+    usage
+    exit 1
+  fi
+  baseurl=${GITHUB_URL:-"https://github.com"}
 fi
 
 if [ -z "$username" ]; then
